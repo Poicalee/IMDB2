@@ -7,8 +7,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Inicjalizacja zmiennych globalnych
 df = None
@@ -107,7 +105,7 @@ def apply_discretization():
 # Tworzenie głównego okna aplikacji
 root = tk.Tk()
 root.title("Przetwarzanie danych CSV i uczenie modelu")
-root.geometry("900x600")
+root.geometry("900x700")
 
 # Sekcja przycisków
 button_frame = tk.Frame(root)
@@ -131,6 +129,27 @@ discretize_button.pack(side="left", padx=5)
 # Sekcja wyświetlania danych
 data_frame = tk.Frame(root)
 data_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+# Sekcja legendy
+legend_frame = tk.Frame(root)
+legend_frame.pack(side="bottom", fill="x", pady=10)
+
+legend_text = """Legenda (opis kolumn)
+Wiek: Wiek użytkownika w latach (18-65).
+Płeć: Płeć użytkownika (0 - kobieta, 1 - mężczyzna).
+Lokalizacja: Lokalizacja użytkownika (1 - region A, 2 - region B, 3 - region C).
+Rodzaj uslugi: Typ usługi używanej przez użytkownika (1 - podstawowa, 2 - premium, 3 - VIP).
+Czas subskrypcji: Czas trwania subskrypcji w miesiącach.
+Czas na platformie: Łączny czas spędzony na platformie w godzinach.
+Liczba reklamacji: Liczba reklamacji zgłoszonych przez użytkownika.
+Srednia transakcji: Średnia liczba transakcji miesięcznych.
+Srednie wydatki: Średnie miesięczne wydatki użytkownika w jednostkach walutowych.
+Zalegle platnosci: Liczba zaległych płatności użytkownika.
+Rabaty: Wartość rabatów przyznanych użytkownikowi (%).
+Porzucenie: Flaga porzucenia (0 - użytkownik pozostał, 1 - użytkownik zrezygnował z subskrypcji).
+"""
+legend_label = tk.Label(legend_frame, text=legend_text, font=('Arial', 10), justify="left", anchor="w")
+legend_label.pack(fill="x", padx=10)
 
 # Uruchomienie aplikacji
 root.mainloop()
