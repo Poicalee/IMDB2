@@ -12,6 +12,7 @@ df_imputed = None
 df_normalized = None
 df_standardized = None
 df_discretized = None
+current_processed_data = None
 
 
 # Funkcja do ładowania pliku CSV
@@ -27,6 +28,27 @@ def load_csv():
             messagebox.showerror("Błąd", f"Nie udało się załadować pliku: {e}")
     else:
         messagebox.showwarning("Brak pliku", "Nie wybrano żadnego pliku.")
+
+
+# Funkcja do eksportu danych do CSV
+def export_to_csv():
+    global current_processed_data
+    if current_processed_data is None:
+        messagebox.showwarning("Błąd", "Brak danych do eksportu!")
+        return
+
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".csv",
+        filetypes=[("CSV files", "*.csv")],
+        title="Eksportuj dane przetworzone do CSV"
+    )
+
+    if file_path:
+        try:
+            current_processed_data.to_csv(file_path, index=False, encoding='utf-8')
+            messagebox.showinfo("Sukces", f"Dane zostały wyeksportowane do:\n{file_path}")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Nie udało się wyeksportować pliku: {e}")
 
 
 # Funkcja do wyświetlania oryginalnego CSV w tabeli
@@ -46,7 +68,6 @@ def show_original_csv():
     for _, row in df.iterrows():
         tree.insert("", "end", values=list(row))
 
-    # Dodanie paska przewijania
     scrollbar = ttk.Scrollbar(original_data_frame, orient="vertical", command=tree.yview)
     tree.configure(yscroll=scrollbar.set)
 
@@ -56,6 +77,9 @@ def show_original_csv():
 
 # Funkcja do wyświetlania przetworzonych danych
 def show_csv(data):
+    global current_processed_data
+    current_processed_data = data
+
     for widget in processed_data_frame.winfo_children():
         widget.destroy()
 
@@ -68,7 +92,6 @@ def show_csv(data):
     for _, row in data.iterrows():
         tree.insert("", "end", values=list(row))
 
-    # Dodanie paska przewijania
     scrollbar = ttk.Scrollbar(processed_data_frame, orient="vertical", command=tree.yview)
     tree.configure(yscroll=scrollbar.set)
 
@@ -200,7 +223,6 @@ Porzucenie: Flaga porzucenia (0 - użytkownik pozostał, 1 - użytkownik zrezygn
     legend_window.title("Legenda CSV")
     legend_window.geometry("700x400")
 
-    # Stylizacja okna legendy
     legend_window.configure(bg="#2c3e50")
 
     legend_label = ttk.Label(
@@ -219,7 +241,7 @@ Porzucenie: Flaga porzucenia (0 - użytkownik pozostał, 1 - użytkownik zrezygn
 root = tk.Tk()
 root.title("Zaawansowane Przetwarzanie Danych")
 root.geometry("1200x900")
-root.configure(bg="#2c3e50")  # Ciemniejszy, elegancki kolor tła
+root.configure(bg="#2c3e50")
 
 # Ulepszona stylizacja
 style = ttk.Style()
@@ -291,7 +313,8 @@ buttons_config = [
     ("Standaryzacja", apply_standardization, "#f39c12"),  # Pomarańczowy
     ("Dyskretyzacja", apply_discretization, "#9b59b6"),  # Fioletowy
     ("Uruchom potok", run_pipeline, "#1abc9c"),  # Morski
-    ("Pokaż legendę", show_legend, "#95a5a6")  # Szary
+    ("Pokaż legendę", show_legend, "#95a5a6"),  # Szary
+    ("Eksportuj CSV", export_to_csv, "#27ae60")  # Zielony
 ]
 
 for (text, command, color) in buttons_config:
