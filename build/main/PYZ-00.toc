@@ -1,1 +1,0 @@
-('C:\\Users\\Karol\\PycharmProjects\\IMDB2\\build\\main\\PYZ-00.pyz', [])
