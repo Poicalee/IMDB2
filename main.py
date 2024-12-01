@@ -1,13 +1,24 @@
 import pandas as pd
-import numpy as np
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, KBinsDiscretizer
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-import tkinter.font as tkfont
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+import warnings
+import logging
+import os
+
+# Ignorowanie ostrzeżeń Pythona
+warnings.filterwarnings("ignore")
+
+# Ignorowanie logów ostrzeżeń
+logging.basicConfig(level=logging.ERROR)
+
+# Ustawienie zmiennych środowiskowych
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
 
 # Inicjalizacja zmiennych globalnych
 df = None
@@ -124,7 +135,7 @@ def show_csv(data):
 
     # Wyświetlanie tabeli
     tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
-    scrollbar.pack(side="right", fill="y", padx=(0,5), pady=5)
+    scrollbar.pack(side="right", fill="y", padx=(0, 5), pady=5)
 
 
 def show_change_statistics():
@@ -175,6 +186,8 @@ Interpretacja:
     stats_label.pack(padx=20, pady=20, expand=True, fill="both")
 
 # Funkcje przetwarzania
+
+
 def apply_knn_imputer():
     global df, df_imputed
     if df is None:
@@ -233,6 +246,8 @@ def apply_discretization():
     df_discretized['porzucenie'] = df_standardized['porzucenie']
     messagebox.showinfo("Sukces", "Dyskretyzacja zakończona!")
     show_csv(df_discretized)
+
+
 def apply_random_forest():
     global df_discretized
 
@@ -274,35 +289,35 @@ def run_pipeline():
     try:
         # Imputacja kNN
         knn_imputer = KNNImputer(n_neighbors=3)
-        df_imputed = pd.DataFrame(
+        df_imputed1 = pd.DataFrame(
             knn_imputer.fit_transform(df.drop('porzucenie', axis=1)),
             columns=df.columns[:-1]
         )
-        df_imputed['porzucenie'] = df['porzucenie']
+        df_imputed1['porzucenie'] = df['porzucenie']
 
         # Normalizacja
         minmax_scaler = MinMaxScaler()
-        df_normalized = pd.DataFrame(
-            minmax_scaler.fit_transform(df_imputed.drop('porzucenie', axis=1)),
-            columns=df_imputed.columns[:-1]
+        df_normalized1 = pd.DataFrame(
+            minmax_scaler.fit_transform(df_imputed1.drop('porzucenie', axis=1)),
+            columns=df_imputed1.columns[:-1]
         )
-        df_normalized['porzucenie'] = df_imputed['porzucenie']
+        df_normalized1['porzucenie'] = df_imputed1['porzucenie']
 
         # Standaryzacja
         standard_scaler = StandardScaler()
-        df_standardized = pd.DataFrame(
-            standard_scaler.fit_transform(df_normalized.drop('porzucenie', axis=1)),
-            columns=df_normalized.columns[:-1]
+        df_standardized1 = pd.DataFrame(
+            standard_scaler.fit_transform(df_normalized1.drop('porzucenie', axis=1)),
+            columns=df_normalized1.columns[:-1]
         )
-        df_standardized['porzucenie'] = df_normalized['porzucenie']
+        df_standardized1['porzucenie'] = df_normalized1['porzucenie']
 
         # Dyskretyzacja
         discretizer = KBinsDiscretizer(n_bins=4, encode='ordinal', strategy='uniform')
         df_discretized = pd.DataFrame(
-            discretizer.fit_transform(df_standardized.drop('porzucenie', axis=1)),
-            columns=df_standardized.columns[:-1]
-        )
-        df_discretized['porzucenie'] = df_standardized['porzucenie']
+            discretizer.fit_transform(df_standardized1.drop('porzucenie', axis=1)),
+            columns=df_standardized1.columns[:-1])
+
+        df_discretized['porzucenie'] = df_standardized1['porzucenie']
 
         # Random Forest na końcu potoku
         apply_random_forest()
@@ -313,6 +328,8 @@ def run_pipeline():
         messagebox.showerror("Błąd", f"Wystąpił problem podczas przetwarzania danych: {e}")
 
 # Funkcja do wyświetlenia legendy
+
+
 def show_legend():
     legend_text = """
 Legenda (opis kolumn)
