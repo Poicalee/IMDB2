@@ -45,6 +45,7 @@ def load_csv():
 
 
 # Funkcja do eksportu danych do CSV
+# noinspection PyUnresolvedReferences
 def export_to_csv():
     global current_processed_data
     if current_processed_data is None:
@@ -66,6 +67,7 @@ def export_to_csv():
 
 
 # Funkcja do wyświetlania oryginalnego CSV w tabeli
+# noinspection PyUnresolvedReferences,PyArgumentList
 def show_original_csv():
     if df is None:
         return
@@ -90,7 +92,8 @@ def show_original_csv():
 
 
 # Funkcja do wyświetlania przetworzonych danych
-def show_csv(data):
+# noinspection PyUnresolvedReferences,PyArgumentList
+def show_csv(data: object) -> object:
     global current_processed_data
     current_processed_data = data
 
@@ -138,6 +141,7 @@ def show_csv(data):
     scrollbar.pack(side="right", fill="y", padx=(0, 5), pady=5)
 
 
+# noinspection PyTypeChecker,PyUnresolvedReferences
 def show_change_statistics():
     global df, current_processed_data
 
@@ -188,6 +192,7 @@ Interpretacja:
 # Funkcje przetwarzania
 
 
+# noinspection PyUnresolvedReferences
 def apply_knn_imputer():
     global df, df_imputed
     if df is None:
@@ -203,6 +208,7 @@ def apply_knn_imputer():
     show_csv(df_imputed)
 
 
+# noinspection PyUnresolvedReferences
 def apply_normalization():
     global df_imputed, df_normalized
     if df_imputed is None:
@@ -218,6 +224,7 @@ def apply_normalization():
     show_csv(df_normalized)
 
 
+# noinspection PyUnresolvedReferences
 def apply_standardization():
     global df_normalized, df_standardized
     if df_normalized is None:
@@ -233,6 +240,7 @@ def apply_standardization():
     show_csv(df_standardized)
 
 
+# noinspection PyUnresolvedReferences
 def apply_discretization():
     global df_standardized, df_discretized
     if df_standardized is None:
@@ -248,6 +256,7 @@ def apply_discretization():
     show_csv(df_discretized)
 
 
+# noinspection PyUnresolvedReferences
 def apply_random_forest():
     global df_discretized
 
@@ -280,6 +289,7 @@ def apply_random_forest():
     show_csv(df_discretized)
 
 
+# noinspection PyUnresolvedReferences
 def run_pipeline():
     global df, df_discretized
     if df is None:
