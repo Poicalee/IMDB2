@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, KBinsDiscretizer
@@ -28,6 +29,64 @@ df_standardized = None
 df_discretized = None
 current_processed_data = None
 
+
+def custom_knn_imputer(data, k=3, weights="uniform", metric="euclidean"):
+    """
+    Custom implementation of KNN imputer mimicking scikit-learn's implementation.
+
+    Args:
+        data (pd.DataFrame): Pandas DataFrame with missing values.
+        k (int): Number of neighbors to consider for imputing.
+        weights (str): Weighting function ("uniform" or "distance").
+        metric (str): Distance metric to use ("euclidean" is supported).
+
+    Returns:
+        pd.DataFrame: Imputed DataFrame.
+    """
+    if metric != "euclidean":
+        raise ValueError("Only 'euclidean' metric is supported in this implementation.")
+    if weights not in {"uniform", "distance"}:
+        raise ValueError("Weights must be either 'uniform' or 'distance'.")
+
+    # Convert to numpy array
+    data_array = data.to_numpy()
+    missing_mask = np.isnan(data_array)
+
+    imputed_values = data_array.copy()
+
+    for row_idx, row in enumerate(data_array):
+        for col_idx, value in enumerate(row):
+            if missing_mask[row_idx, col_idx]:  # Missing value detected
+                # Calculate distances to other rows (ignoring the current row)
+                distances = []
+                valid_neighbors = []
+
+                for neighbor_idx, neighbor_row in enumerate(data_array):
+                    if neighbor_idx != row_idx and not np.isnan(neighbor_row[col_idx]):
+                        # Compute distance on non-NaN shared features
+                        non_nan_indices = ~missing_mask[row_idx] & ~missing_mask[neighbor_idx]
+                        if np.any(non_nan_indices):
+                            dist = np.sqrt(np.sum((row[non_nan_indices] - neighbor_row[non_nan_indices]) ** 2))
+                            distances.append((dist, neighbor_row[col_idx]))
+
+                # Sort neighbors by distance
+                distances.sort(key=lambda x: x[0])
+                valid_neighbors = distances[:k]
+
+                if valid_neighbors:
+                    if weights == "uniform":
+                        # Take mean of the k nearest neighbors
+                        imputed_value = np.mean([val for _, val in valid_neighbors])
+                    elif weights == "distance":
+                        # Weighted mean of the k nearest neighbors (1/distance weighting)
+                        weighted_values = [val / dist if dist > 0 else val for dist, val in valid_neighbors]
+                        weights_sum = np.sum([1 / dist if dist > 0 else 1 for dist, _ in valid_neighbors])
+                        imputed_value = np.sum(weighted_values) / weights_sum
+
+                    # Assign imputed value to the missing cell
+                    imputed_values[row_idx, col_idx] = imputed_value
+
+    return pd.DataFrame(imputed_values, columns=data.columns)
 
 # Funkcja do ładowania pliku CSV
 def load_csv():
@@ -192,20 +251,38 @@ Interpretacja:
 # Funkcje przetwarzania
 
 
-# noinspection PyUnresolvedReferences
+
 def apply_knn_imputer():
     global df, df_imputed
     if df is None:
         messagebox.showwarning("Błąd", "Załaduj najpierw plik CSV!")
         return
-    knn_imputer = KNNImputer(n_neighbors=3)
-    df_imputed = pd.DataFrame(
-        knn_imputer.fit_transform(df.drop('porzucenie', axis=1)),
-        columns=df.columns[:-1]
-    )
-    df_imputed['porzucenie'] = df['porzucenie']
-    messagebox.showinfo("Sukces", "Imputacja kNN zakończona!")
-    show_csv(df_imputed)
+
+    knn_method = knn_method_var.get()  # Get selected method
+    try:
+        # Separate features and target
+        features = df.drop('porzucenie', axis=1)
+        target = df['porzucenie']
+
+        if knn_method == "Scikit-learn":
+            knn_imputer = KNNImputer(n_neighbors=4)
+            imputed_features = knn_imputer.fit_transform(features)
+        elif knn_method == "Custom":
+            imputed_features = custom_knn_imputer(features, k=4)
+        else:
+            raise ValueError("Nieznana metoda imputacji KNN.")
+
+        # Reconstruct DataFrame with imputed features and original target
+        df_imputed = pd.DataFrame(imputed_features, columns=features.columns)
+        df_imputed['porzucenie'] = target
+
+        messagebox.showinfo("Sukces", f"Imputacja {knn_method} zakończona!")
+        show_csv(df_imputed)
+    except Exception as e:
+        messagebox.showerror("Błąd", f"Imputacja zakończona niepowodzeniem: {e}")
+
+# noinspection PyUnresolvedReferences
+
 
 
 # noinspection PyUnresolvedReferences
@@ -271,7 +348,7 @@ def apply_random_forest():
     # Podział na zbiór treningowy i testowy
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Tworzenie modelu Random Forest
+    # Tworzenie models Random Forest
     rf = RandomForestClassifier(n_estimators=100, random_state=42)
     rf.fit(X_train, y_train)
 
@@ -441,6 +518,15 @@ style.configure("Treeview.Heading",
 # Sekcja przycisków z bardziej responsywnym układem
 button_frame = ttk.Frame(root)
 button_frame.pack(side="top", fill="x", pady=15, padx=15)
+# Add a dropdown menu to choose the KNN method
+knn_method_var = tk.StringVar(value="Scikit-learn")
+knn_method_dropdown = ttk.Combobox(
+    button_frame,
+    textvariable=knn_method_var,
+    values=["Scikit-learn", "Custom"],
+    state="readonly"
+)
+knn_method_dropdown.pack(side="left", padx=5)
 
 
 # Lista przycisków z bardziej dynamicznym stylem
