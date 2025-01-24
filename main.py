@@ -10,6 +10,7 @@ from sklearn.metrics import accuracy_score
 import warnings
 import logging
 import os
+from collections import Counter
 
 # Ignorowanie ostrzeżeń Pythona
 warnings.filterwarnings("ignore")
@@ -87,6 +88,129 @@ def custom_knn_imputer(data, k=3, weights="uniform", metric="euclidean"):
                     imputed_values[row_idx, col_idx] = imputed_value
 
     return pd.DataFrame(imputed_values, columns=data.columns)
+
+
+class CustomRandomForest:
+    def __init__(self, n_estimators=100, max_depth=10, min_samples_split=2, random_state=None):
+        # Inicjalizacja parametrów lasu losowego
+        self.n_estimators = n_estimators  # Liczba drzew w lesie
+        self.max_depth = max_depth  # Maksymalna głębokość każdego drzewa
+        self.min_samples_split = min_samples_split  # Minimalna liczba próbek do podziału węzła
+        self.random_state = random_state  # Ziarno losowości dla powtarzalności wyników
+        self.trees = []  # Lista na przechowywanie drzew
+
+    class DecisionTree:
+        def __init__(self, max_depth=10, min_samples_split=2):
+            # Inicjalizacja parametrów pojedynczego drzewa
+            self.max_depth = max_depth  # Maksymalna głębokość drzewa
+            self.min_samples_split = min_samples_split  # Minimalna liczba próbek do podziału
+            self.tree = None  # Struktura drzewa
+
+        def gini(self, y):
+            # Obliczanie współczynnika Giniego dla danego zbioru etykiet
+            _, counts = np.unique(y, return_counts=True)  # Zliczanie wystąpień każdej klasy
+            probabilities = counts / len(y)  # Obliczanie prawdopodobieństw
+            return 1 - np.sum(probabilities ** 2)  # Wzór na współczynnik Giniego
+
+        def split_data(self, X, y, feature_idx, threshold):
+            # Podział danych na podstawie wartości progowej dla wybranej cechy
+            left_mask = X[:, feature_idx] <= threshold  # Maska dla lewej strony podziału
+            # Zwraca dane podzielone na lewą i prawą stronę
+            return (X[left_mask], y[left_mask], X[~left_mask], y[~left_mask])
+
+        def find_best_split(self, X, y):
+            # Znajdowanie najlepszego podziału danych
+            best_gini = float('inf')  # Inicjalizacja najlepszego współczynnika Giniego
+            best_split = None  # Inicjalizacja najlepszego podziału
+
+            # Przeszukiwanie wszystkich cech i możliwych wartości progowych
+            for feature_idx in range(X.shape[1]):
+                thresholds = np.unique(X[:, feature_idx])
+                for threshold in thresholds:
+                    # Podział danych dla danej wartości progowej
+                    X_left, y_left, X_right, y_right = self.split_data(X, y, feature_idx, threshold)
+                    if len(y_left) == 0 or len(y_right) == 0:
+                        continue  # Pomijanie podziałów, które dają puste zbiory
+
+                    # Obliczanie ważonego współczynnika Giniego
+                    gini = (len(y_left) * self.gini(y_left) + len(y_right) * self.gini(y_right)) / len(y)
+                    # Aktualizacja najlepszego podziału
+                    if gini < best_gini:
+                        best_gini = gini
+                        best_split = (feature_idx, threshold)
+
+            return best_split
+
+        def build_tree(self, X, y, depth=0):
+            # Rekurencyjne budowanie drzewa decyzyjnego
+            n_samples = len(y)
+
+            # Warunki stopu rekurencji
+            if (depth >= self.max_depth or
+                    n_samples < self.min_samples_split or
+                    len(np.unique(y)) == 1):
+                return Counter(y).most_common(1)[0][0]  # Zwraca najczęstszą klasę
+
+            # Znajdowanie najlepszego podziału
+            best_split = self.find_best_split(X, y)
+            if best_split is None:
+                return Counter(y).most_common(1)[0][0]
+
+            # Tworzenie węzła drzewa i rekurencyjne budowanie poddrzew
+            feature_idx, threshold = best_split
+            X_left, y_left, X_right, y_right = self.split_data(X, y, feature_idx, threshold)
+
+            return {
+                'feature_idx': feature_idx,
+                'threshold': threshold,
+                'left': self.build_tree(X_left, y_left, depth + 1),
+                'right': self.build_tree(X_right, y_right, depth + 1)
+            }
+
+        def fit(self, X, y):
+            # Trenowanie drzewa
+            self.tree = self.build_tree(X, y)
+
+        def predict_single(self, x, tree):
+            # Predykcja dla pojedynczej próbki
+            if not isinstance(tree, dict):
+                return tree  # Zwraca klasę jeśli to liść
+            # Rekurencyjne przechodzenie przez drzewo
+            if x[tree['feature_idx']] <= tree['threshold']:
+                return self.predict_single(x, tree['left'])
+            return self.predict_single(x, tree['right'])
+
+        def predict(self, X):
+            # Predykcja dla wielu próbek
+            return np.array([self.predict_single(x, self.tree) for x in X])
+
+    def fit(self, X, y):
+        # Trenowanie lasu losowego
+        if self.random_state is not None:
+            np.random.seed(self.random_state)  # Ustawienie ziarna losowości
+
+        n_samples = X.shape[0]
+        self.trees = []
+
+        # Tworzenie i trenowanie poszczególnych drzew
+        for _ in range(self.n_estimators):
+            # Bootstrap sampling - losowanie próbek z powtórzeniami
+            indices = np.random.choice(n_samples, n_samples, replace=True)
+            X_bootstrap = X[indices]
+            y_bootstrap = y[indices]
+
+            # Tworzenie i trenowanie pojedynczego drzewa
+            tree = self.DecisionTree(self.max_depth, self.min_samples_split)
+            tree.fit(X_bootstrap, y_bootstrap)
+            self.trees.append(tree)
+
+    def predict(self, X):
+        # Predykcja całego lasu losowego
+        # Zbieranie predykcji ze wszystkich drzew
+        predictions = np.array([tree.predict(X) for tree in self.trees])
+        # Głosowanie większościowe dla każdej próbki
+        return np.array([Counter(predictions[:, i]).most_common(1)[0][0]
+                         for i in range(predictions.shape[1])])
 
 # Funkcja do ładowania pliku CSV
 def load_csv():
@@ -335,35 +459,47 @@ def apply_discretization():
 
 # noinspection PyUnresolvedReferences
 def apply_random_forest():
+    # Funkcja aplikująca las losowy do danych
     global df_discretized
 
+    # Sprawdzenie czy dane są zdyskretyzowane
     if df_discretized is None:
         messagebox.showwarning("Błąd", "Najpierw wykonaj dyskretyzację!")
         return
 
     # Przygotowanie danych do klasyfikacji
-    X = df_discretized.drop('porzucenie', axis=1)
-    y = df_discretized['porzucenie']
+    X = df_discretized.drop('porzucenie', axis=1).values  # Cechy
+    y = df_discretized['porzucenie'].values              # Etykiety
 
-    # Podział na zbiór treningowy i testowy
+    # Podział na zbiór treningowy i testowy (80/20)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Tworzenie models Random Forest
-    rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    rf.fit(X_train, y_train)
+    # Pobranie wybranej metody (Scikit-learn lub Custom)
+    rf_method = rf_method_var.get()
 
-    # Predykcja
-    y_pred = rf.predict(X_test)
+    try:
+        # Wybór i inicjalizacja odpowiedniego klasyfikatora
+        if rf_method == "Scikit-learn":
+            rf = RandomForestClassifier(n_estimators=100, random_state=42)
+        else:  # Custom
+            rf = CustomRandomForest(n_estimators=100, random_state=42)
 
-    # Obliczenie dokładności
-    accuracy = accuracy_score(y_test, y_pred)
-    messagebox.showinfo("Sukces", f"Dokładność klasyfikacji Random Forest: {accuracy * 100:.2f}%")
+        # Trenowanie modelu i wykonanie predykcji
+        rf.fit(X_train, y_train)
+        y_pred = rf.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
 
-    # Uaktualnienie decyzji na podstawie predykcji Random Forest
-    df_discretized['porzucenie'] = rf.predict(X)
+        # Wyświetlenie wyników
+        messagebox.showinfo("Sukces",
+                            f"Dokładność klasyfikacji Random Forest ({rf_method}): {accuracy * 100:.2f}%")
 
-    # Wyświetlenie zaktualizowanych danych
-    show_csv(df_discretized)
+        # Aktualizacja decyzji w danych
+        df_discretized['porzucenie'] = rf.predict(X)
+        show_csv(df_discretized)
+
+    except Exception as e:
+        # Obsługa błędów
+        messagebox.showerror("Błąd", f"Wystąpił problem podczas klasyfikacji: {e}")
 
 
 # noinspection PyUnresolvedReferences
@@ -527,6 +663,14 @@ knn_method_dropdown = ttk.Combobox(
     state="readonly"
 )
 knn_method_dropdown.pack(side="left", padx=5)
+rf_method_var = tk.StringVar(value="Scikit-learn")
+rf_method_dropdown = ttk.Combobox(
+    button_frame,
+    textvariable=rf_method_var,
+    values=["Scikit-learn", "Custom"],
+    state="readonly"
+)
+rf_method_dropdown.pack(side="left", padx=5)
 
 
 # Lista przycisków z bardziej dynamicznym stylem
